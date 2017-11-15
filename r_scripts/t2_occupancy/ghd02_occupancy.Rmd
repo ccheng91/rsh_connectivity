@@ -1,0 +1,184 @@
+---
+title: "Occupancy Analysis"
+author: "burkeprw"
+date: "November 12, 2017"
+output: github_document
+---
+
+First, load packages.
+
+```{r message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(forcats))
+suppressPackageStartupMessages(library(camtrapR))
+suppressPackageStartupMessages(library(unmarked))
+```
+
+
+### Step 1: Read Data in Wide Format for `unmarked`  
+
+I read the .rds file saved in [Task 1](https://github.com/burkeprw/rsh_zool500_bats/blob/master/r_scripts/t1_tidydata/ghd01_tidydata.md). I also read data files from BC Agricultural Land Use Inventory (ALUI) for cover type and land use data. It is necessary to make the following formatting adjustments to the .csv data:  
+- DateTimeOriginal column is formatted as YYYY-MM-DD hh:mm:ss in Excel before saving, then read into R using `format = "%Y-%m-%d %H:%M:%S`  
+
+I made the following edits to "all_sitecovs.csv":
+- added BC ALUI landcovers   
+- added elevation from DEM   
+- changes Site names for NABat sites with year prefix
+- removed sites with NA start dates   
+- Added 14 iterations of the observation covariates: GLA and LAI.4   
+
+```{r warning=FALSE, message=FALSE}
+
+all_obs_full_read <- readRDS("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/all_obs_comp.rds")
+
+sitecovs <- read_csv("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/data_copy/all_sitecovs.csv")
+
+sites_bats <- read_csv("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/dat_allsites.csv")
+
+sites <- left_join(sites_bats,sitecovs,"Site")
+sites_2016 <- filter(sites, Surv_yr == 2016)
+sites_2016$start_date <- as.Date(sites_2016$start_date , "%Y-%m-%d")
+sites_2016$end_date <- as.Date(sites_2016$end_date , "%Y-%m-%d")
+
+```
+
+Look at the distribution of sampling periods across time:   
+
+```{r}
+
+det_op <- data.frame(lapply(sites_2016, as.character), stringsAsFactors=FALSE)
+
+detop <- cameraOperation(CTtable = det_op,           # Update with problems
+                                   stationCol = "Site",
+                                   setupCol = "start_date",
+                                   retrievalCol = "end_date",
+                                   writecsv = FALSE,
+                                   hasProblems = TRUE,    #TEMP     
+                                   dateFormat = "%Y-%m-%d"
+                                   )
+
+camopPlot <- function(camOp){
+  which.tmp <- grep(as.Date(colnames(camOp)), pattern = "01$")
+  label.tmp <- format(as.Date(colnames(camOp))[which.tmp], "%Yâ€%m")
+  at.tmp <- which.tmp / ncol(camOp)
+  image(t(as.matrix(camOp)), xaxt = "n", yaxt = "n", col = c("red", "grey70"))
+  axis(1, at = at.tmp, labels = label.tmp)
+  axis(2, at = seq(from = 0, to = 1, length.out = nrow(camOp)), labels = rownames(camOp), las = 1)
+  abline(v = at.tmp, col = rgb(0,0,0, 0.2))
+  box()
+}
+camopPlot(camOp = detop)
+
+
+
+```
+
+
+I coerce the data using the package `camtrapR` and function 'detectionHistory()' to prepare for modeling. Date requirements for `unmarked` include 1st 3 columns in this order: site, date, and the occ/count variable, followed by detection periods. Here I use 4 day sample periods (occasionLength = 7).   
+
+Need to check for:   
+- missing data   
+- detector not working   
+
+```{r pressure, echo=FALSE}
+
+all_obs_ungroup <- ungroup(all_obs_full_read)
+all_obs_df <- as.data.frame(all_obs_ungroup) %>%
+  mutate(DateTimeOriginal_fmt = as.Date(DateTimeOriginal, format = "%Y-%m-%d %H:%M:%S"))
+#write_csv(all_obs_df,"datecheck.csv")
+
+#all_obs_df %>%
+#  group_by(Sp_final) %>%
+#  summarize(max(length(Count)))
+
+DetHist_Mylu <- detectionHistory(recordTable = all_obs_df,
+                                 camOp = detop,
+                                 stationCol = "Site",
+                                 speciesCol = "Sp_final",
+                                 recordDateTimeCol = "DateTimeOriginal",
+                                 recordDateTimeFormat = "%Y-%m-%d %H:%M:%S",
+                                 species = "MYLU",
+                                 occasionLength = 4,
+                                 day1 = "station",
+                                 timeZone = "America/Vancouver",
+                                 includeEffort = FALSE,
+                                 #datesAsOccasionNames = TRUE,
+                                 #scaleEffort = TRUE,
+                                 writecsv = TRUE,
+                                 outDir = "C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/rDetHist")
+
+```
+
+### Occupancy Model: ___Myotis lucifugus___ (MYLU)
+
+Here I run preliminary occupancy models and model selection for the endangered MYLU.   
+- **Occupancy covariates:** Elevation   
+- **Detectability covariates:** GLA, LAI.4, LAI.5   
+
+You can also embed plots, for example:
+
+```{r echo=FALSE, warning=FALSE}
+occMYLU <- read_csv("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/rDetHist/DetHist_MYLU.csv", col_names = TRUE, 
+                      col_types = cols(
+                          X1 = col_character(),
+                          o1 = col_logical(),
+                          o2 = col_logical(),
+                          o3 = col_logical(),
+                          o4 = col_logical(),
+                          o5 = col_logical(),
+                          o6 = col_logical(),
+                          o7 = col_logical(),
+                          o8 = col_logical(),
+                          o9 = col_logical(),
+                          o10 = col_logical(),
+                          o11 = col_logical(), 
+                          o12 = col_logical(),
+                          o13 = col_logical(),
+                          o14 = col_logical()), locale = default_locale(), na = c("", "NA"))
+y <- occMYLU[,2:15]
+siteCovs <- sites_2016[,c("Elev")]
+
+GLA <- sites_2016[,c("GLA.1","GLA.2","GLA.3","GLA.4","GLA.5","GLA.6","GLA.7","GLA.8","GLA.9","GLA.10","GLA.11","GLA.12","GLA.13","GLA.14")]
+GLA_ungroup <- ungroup(GLA)
+GLA_df <- as.data.frame(GLA_ungroup)
+
+LAI.4 <- sites_2016[,c("LAI.4.1","LAI.4.2","LAI.4.3","LAI.4.4","LAI.4.5","LAI.4.6","LAI.4.7","LAI.4.8","LAI.4.9","LAI.4.10","LAI.4.11","LAI.4.12","LAI.4.13","LAI.4.14")]
+LAI.4_ungroup <- ungroup(LAI.4)
+LAI.4_df <- as.data.frame(LAI.4_ungroup)
+                       
+obsCovs <- list(gaplight=GLA_df, leafarea=LAI.4_df)
+#names(obsCovs) <- c("gaplight","leafarea")
+
+myluUMF <- unmarkedFrameOccu(y = y, siteCovs = siteCovs, obsCovs = obsCovs)
+
+summary(myluUMF)
+plot(myluUMF, panels = 4)
+# Double right-hand side formula describing covariates of detection and occupancy in that order
+fm1 <- occu(~ 1 ~ 1, myluUMF)
+fm2 <- occu(~ 1 ~ Elev, myluUMF)
+fm3 <- occu(~ leafarea ~ 1, myluUMF)
+fm4 <- occu(~ gaplight ~ 1, myluUMF)
+fm5 <- occu(~ leafarea + gaplight ~ 1, myluUMF)
+#fm5 <- occu(~ 1 ~ Elev, myluUMF, starts=c(100,1000,0))# how to improve starting values?
+#fm6 <- occu(~ 1 ~ habitat, myluUMF)
+
+## Model Selection
+fmsMYLU <- fitList('psi(.)p(.)' = fm1,
+               'psi(.)p(elevation)' = fm2,
+               'psi(leaf area index)p(.)' = fm3,
+               'psi(gap light)p(.)' = fm4,
+               'psi(leaf area index + gap light)p(.)' = fm5 )
+modSel(fmsMYLU)
+
+```
+
+
+### Session Info
+
+```{r}
+sessionInfo()
+```
+
+
