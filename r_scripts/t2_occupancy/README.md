@@ -5,50 +5,39 @@ Last modified: ___2017-Nov-15___
 
 ### Task2: Occupancy Models
 
-I will use occupancy models to predict occupancy across the study area using quantitative camera trap data. Here I provide results from occupancy models for the following species and functional groups:
-- Coyote  
+Code for this task can be found in the Markdown document [ghd02_occupancy.md](https://github.com/burkeprw/rsh_connectivity/blob/master/r_scripts/t2_occupancy/ghd02_occupancy.md).  
+
+I use occupancy models to predict occupancy across the study area using quantitative camera trap data. Here I provide results from occupancy models for the following species and functional groups:
+- Mule deer  
+- American Black Bear   
+- Coyote   
 - Cougar  
-- Black-tailed deer  
-- Elk  
-- Bear  
-- Herbivores  
-- Carnivores  
+- Bobcat  
+- Herbivores   
+- Carnivores   
   
 ## Methods
-I will use `unmarked` to estimate species occupancy.  
+I fit the fit the [MacKenzie et al. (2002)](https://www.uvm.edu/rsenr/vtcfwru/spreadsheets/occupancy/Occupancy%20Exercises/Exercise3/MacKenzie%20et%20al.%20single-season.pdf) model to camera trap data using the `unmarked:occu()` function. I used data from 5 months of sampling during the snow-free season when wildfire occurrs in the study region (May 15 to Octber 15). I assume that the population is closed during this period, with no immigration or emigration, to satiisfy the statistical framework. To satisfy the assumption of site independence, a minimum distance of 1000 m was maintained between camera locations.  
 
-Observation covariates:   
-1. Elevation   
-2. Landcover     
+#### Observation covariates:   
+ - **Terrain Ruggedness Index (TRI_STRM):** Terrain Ruggedness Index (TRI) is the difference between the value of a cell and the mean of an 8-cell neighborhood of surrounding cells. I use a digital elevation model xxx I used ArcGIS (the Riley et al. (1999) METHODS)?? 
+ - **Years Since Fire (yrsinc_FIRE):**   
+ - **Fire Severity (zs_MEAN):** A mean of fire severity values within 500m of the camera location. USGS provides fire severity models across the US portion of the study area using LANDFIRE methods, which are based on Landsat spectral imagery.   
+ - **Landcover:** class (USGS model)  
+ 
+#### Detectability covariates:
+ - **Visibility (visib):** A metric of general visibility at each camera site. The linear distance (in meters) from the camera sensor to the furthest point of detection was recorded during camera deployment. Local vegetation and terrain features and camera deployment location dictate the visibility at each site. Visibility is assumed constant across all sample occassions at each site.     
+ - **Effort (effort):** The number of days the camera was operational during each occassion (out of 7d ocassion length).  Effort is reduced by camera malfunctions, loss of power, or other     
 
-Detectability covariates:   
-1. Gap light   
-2. Leaf area index   
-3. Microphone height   
-4. Equipment type (recording unit and microphone)     
 
-
-**Table 2-1:** Bat Species List for BC
+**Table 2-1:** TABLE
 
 Species|Code|Provincial<br>Status|Federal<br>Status|WNS<br>Impacts              
 -----------------------------|----|------------|----------------|----------   
 Big Brown Bat	               |EPFU|Not At Risk |      	         |Low          
 Silver-haired Bat            |LANO|Not At Risk |      	         |Low          
 Hoary Bat	                   |LACI|Not At Risk |                |Very Low     
-California Myotis            |MYCA|Not At Risk |                |**High**     
-Long-eared Myotis	(Keen's)   |MYEV|Not At Risk |Endangered      |**Severe**   
-Little Brown Myotis	         |MYLU|Not At Risk |      	         |**Severe**   
-Long-legged Myotis	         |MYVO|Not At Risk |      	         |**High**     
-Yuma Myotis                  |MYYU|Not At Risk |      	         |**Severe**   
-Western Small-footed Myotis  |MYCI|Blue        |                |**Severe**   
-Fringed Myotis	             |MYTH|Blue        |Data Deficient  |Unknown        
-Northern Myotis       	     |MYSE|Blue	      |Endangered      |**Severe** 
-Eastern Red Bat	             |LABO|Unknown     |          	     |Low	       
-Townsend's Big-eared Bat	   |COTO|Blue        |          	     |Unknown    
-Pallid Bat            	     |ANPA|Red         |Threatened	     |Unknown    
-Spotted Bat           	     |EUMA|Blue        |Special Concern |Unknown     
 
-\* WNS Impacts are unknown for all species in the West. However, these qualitative impact categories have been assigned given the magnitude of population response for similar species in the east, species with similar physiology, expert opinion, and disease modeling.
 
 
 ## Model Results
