@@ -17,47 +17,40 @@ suppressPackageStartupMessages(library(unmarked))
 ```
 
 
-### Step 1: Read Data in Wide Format for `unmarked`  
+### Step 1: Read Covariate Data in Wide Format for `unmarked`  
 
 The first step is to set up an unmarked frame containing detection history and covariates for each species and functional group. The site data and detection histories are saved in [data_copy](https://github.com/burkeprw/rsh_connectivity/tree/master/data_copy). 
 
-The record table is created using the `camptrapR:recordTable()` which reads image metadata (including species codes) directly from image files using the free software `ExifTool` and `digiKam`. Code for extracting this information and writing detection histories to file can be found in [01_analysis_camtrapR_20170717.R](https://github.com/burkeprw/rsh_connectivity/blob/master/r_scripts/t2_occupancy/01_analysis_camtrapR_20170717.R).
+The record table is created using the `camptrapR:recordTable()` which reads image metadata (including species codes) directly from image files using the free software `ExifTool` and `digiKam`. Code for extracting this information and writing detection histories to file can be found in [01_analysis_camtrapR_20170717.R](https://github.com/burkeprw/rsh_connectivity/blob/master/r_scripts/t2_occupancy/01_analysis_camtrapR_20170717.R).  
 
-
-I read the .rds file saved in [Task 1](https://github.com/burkeprw/rsh_zool500_bats/blob/master/r_scripts/t1_tidydata/ghd01_tidydata.md). I also read data files from BC Agricultural Land Use Inventory (ALUI) for cover type and land use data. It is necessary to make the following formatting adjustments to the .csv data:  
-- DateTimeOriginal column is formatted as YYYY-MM-DD hh:mm:ss in Excel before saving, then read into R using `format = "%Y-%m-%d %H:%M:%S`  
-
-I made the following edits to "ct_gncesites_2017-07jul15.csv":
+I made the following edits to "ct_gncesites_2017-07jul15.csv" using ArcGIS to extract raster values at sample locatoins:   
 - added topographic ruggedness (TRI_STRM)    
 - added years since fire, based on     
-- changes Site names for NABat sites with year prefix
-- removed sites with NA start dates   
-- Added 14 iterations of the observation covariates: GLA and LAI.4   
+- added fire severity (zs_MEAN)
+- added landcover  
 
 ```{r warning=FALSE, message=FALSE}
 
-sites <- read_csv("ct_gncesites_2017-07jul15.csv")
+sites <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/ct_gncesites_2017-07jul15.csv", col_names = TRUE, na = c("", "NA")) 
+sites_df <- ungroup(sites) %>%
+  as.data.frame(sites)
 
-sites_bats <- read_csv("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/dat_allsites.csv")
-
-sites <- left_join(sites_bats,sitecovs,"Site")
-sites_2016 <- filter(sites, Surv_yr == 2016)
-sites_2016$start_date <- as.Date(sites_2016$start_date , "%Y-%m-%d")
-sites_2016$end_date <- as.Date(sites_2016$end_date , "%Y-%m-%d")
+#sites$deploy_date <- as.Date(sites$deploy_date, "%Y-%m-%d")
+#sites_2016$lastimg_date <- as.Date(sites_2016$lastimg_date , "%Y-%m-%d")
 
 ```
 
 
-Look at the distribution of sampling periods across time:   
+Next we will look at the distribution of sampling periods across time.  Sampling occurred during the snow-free months between 2016-Apr-10 and 2016-Nov-07 when wildfire are most likely.       
 
 ```{r}
 
-det_op <- data.frame(lapply(sites_2016, as.character), stringsAsFactors=FALSE)
+det_op <- data.frame(lapply(sites_df, as.character), stringsAsFactors=FALSE)
 
-detop <- cameraOperation(CTtable = det_op,           # Update with problems
-                                   stationCol = "Site",
-                                   setupCol = "start_date",
-                                   retrievalCol = "end_date",
+detop <- cameraOperation(CTtable = det_op,           
+                                   stationCol = "Station",
+                                   setupCol = "deploy_date",
+                                   retrievalCol = "lastimg_date",
                                    writecsv = FALSE,
                                    hasProblems = TRUE,    #TEMP     
                                    dateFormat = "%Y-%m-%d"
@@ -75,21 +68,13 @@ camopPlot <- function(camOp){
 }
 camopPlot(camOp = detop)
 
-
-
 ```
 
 
-Next I set up observation and site covariate data frames.
-
-"ObsCovs_effort_scaled.csv"
-
-"ObsCovs_vist_wt.csv"
+Next I set up observation and site covariate data frames. I create a list of the camera sampling stations in alphabetical order. Then I read in covariates for camera effort (total number of days per occassion; "ObsCovs_effort_scaled.csv") and visibility (measure of linear distance sampled in fromt of the camera sensor; "ObsCovs_vist_wt.csv").  
 
 
 ```{r warning=FALSE, message=FALSE}
-
-# list of stations in alphabetical order for row.names
 
 stations <- c("CT-3-DEGU1-0501", "CT-27-COCR2-0625", "CT-28-REPE2-0830", "CT-115-LAMC-0501", "CT-115-WHCK-0714",
               "CT-133-WUDH-0815", "CT-283-STRF-0824", "CT-286-SHFI-0824", "CT-287-RAME1-0826", "CT-287-MCGM-0623",
@@ -101,17 +86,18 @@ stations <- c("CT-3-DEGU1-0501", "CT-27-COCR2-0625", "CT-28-REPE2-0830", "CT-115
               "CT-1374-SUMC-0521", "CT-1390-SOWC-0520", "CT-1465-EIMC-0523", "CT-1501-CORI-0714", "CT-1596-WIWE-0522", 
               "CT-1597-LODM-0523", "CT-1598-PARI1-0430", "CT-1599-COOC-0522", "CT-1600-PETC-0522", "CT-1602-HEOC-0522", 
               "CT-1605-BOCK-0421" )
-effort <- read.csv(file = "~/_research_projects/prj_1601ubc_gnce_connectivity/methods/02_occupancy/rOutput/ObsCovs_effort_scaled.csv",
-                   header = TRUE, row.names = stations,  stringsAsFactors = FALSE, na.strings = "NA")
 
-# check that row names match
-effort <- effort[ -c(1)] # remove redundant column
-visib <- read.csv(file = "~/_research_projects/prj_1601ubc_gnce_connectivity/methods/02_occupancy/rOutput/ObsCovs_vist_wt.csv", 
-                  header = TRUE, row.names = stations, stringsAsFactors = FALSE, na.strings = "NA")
-visib <- visib[ -c(1)] # remove redundant column
-visib.z <- scale(visib) # standardize
+effort <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/ObsCovs_effort_scaled.csv", col_names = TRUE, na = c("", "NA"))
+effort <- effort[ -c(1)] # remove column with station name
+effort_df <- ungroup(effort) %>%
+  as.data.frame(effort)
 
-siteCovs <- ct_tidy[ ,c("cc_oc","TRI_STRM","yrsinc_FIRE","zs_MEAN","landcover","elev")]
+visib <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/ObsCovs_vist_wt.csv", col_names = TRUE, na = c("", "NA"))
+visib <- visib[ -c(1)] # remove column with station name
+#visib.z <- scale(visib) # standardize
+visib_df <- as.data.frame(visib)
+
+siteCovs <- sites[ ,c("cc_oc","TRI_STRM","yrsinc_FIRE","zs_MEAN","landcover","elev")]
 
 cc_oc.z <- scale(siteCovs$cc_oc)
 TRI_STRM.z <- scale(siteCovs$TRI_STRM)
@@ -123,16 +109,15 @@ elev.z <- scale(siteCovs$elev)
 siteCovs <- data.frame(cc_oc=cc_oc.z,TRI_STRM=TRI_STRM.z,yrsinc_FIRE=yrsinc_FIRE.z,zs_MEAN=zs_MEAN.z,
                        landcover=landcover,elev=elev.z)
 
-obsCovs <- list(effort=effort[,c("o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10",
+obsCovs <- list(effort=effort_df[,c("o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10",
                                  "o11", "o12", "o13", "o14", "o15", "o16", "o17", "o18", "o19", "o20",
                                  "o21", "o22", "o23")],
-                  visib=visib.z[,c("o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10",
+                  visib=visib_df[,c("o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10",
                                  "o11", "o12", "o13", "o14", "o15", "o16", "o17", "o18", "o19", "o20",
                                  "o21", "o22", "o23")])
-
 ```
 
-#          Part 2) Single-season species-specific occupancy models and Model selection using AIC
+Next, I set up unmarked frame containing detection history and covariates for each species and functional group. The site data and detection histories are saved in [data_copy](https://github.com/burkeprw/rsh_connectivity/tree/master/data_copy).
 
 Next I will make detection histories for each species and functional group using the package `camtrapR` and function 'detectionHistory()'. Date requirements for `unmarked` include 1st 3 columns in this order: site, date, and the occ/count variable, followed by detection periods. Here I use 7 day sample periods (occasionLength = 7).   
 
@@ -142,95 +127,300 @@ Need to check for:
 
 ```{r pressure, echo=FALSE}
 
-all_obs_ungroup <- ungroup(all_obs_full_read)
-all_obs_df <- as.data.frame(all_obs_ungroup) %>%
-  mutate(DateTimeOriginal_fmt = as.Date(DateTimeOriginal, format = "%Y-%m-%d %H:%M:%S"))
-#write_csv(all_obs_df,"datecheck.csv")
+# Mule deer
+DH_Odhe_df <- read.csv(file = "C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/DetHist_Odhe.csv", header = TRUE, row.names = stations, stringsAsFactors = FALSE, na.strings = "NA")
+DH_Odhe_df <- DH_Odhe_df[ -c(1)] # remove redundant row
+umf_Odhe <- unmarkedFrameOccu(y = DH_Odhe_df, siteCovs = siteCovs, obsCovs = obsCovs) # unmarked frame object
+#summary(umf_Odhe) 
+#str(DH_Uram_df)
 
-#all_obs_df %>%
-#  group_by(Sp_final) %>%
-#  summarize(max(length(Count)))
+# American black bear
+DH_Uram_df <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/DetHist_Uram.csv", col_names = TRUE, na = c("", "NA"))
+DH_Uram_df <- DH_Uram_df[ -c(1)] # remove redundant row
+umf_Uram <- unmarkedFrameOccu(y = DH_Uram_df, siteCovs = siteCovs, obsCovs = obsCovs) # unmarked frame object
+#summary(umf_Uram)
 
-DetHist_Mylu <- detectionHistory(recordTable = all_obs_df,
-                                 camOp = detop,
-                                 stationCol = "Site",
-                                 speciesCol = "Sp_final",
-                                 recordDateTimeCol = "DateTimeOriginal",
-                                 recordDateTimeFormat = "%Y-%m-%d %H:%M:%S",
-                                 species = "MYLU",
-                                 occasionLength = 7,
-                                 day1 = "station",
-                                 timeZone = "America/Vancouver",
-                                 includeEffort = FALSE,
-                                 #datesAsOccasionNames = TRUE,
-                                 #scaleEffort = TRUE,
-                                 writecsv = TRUE,
-                                 outDir = "C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/rDetHist")
+# Coyote
+DH_Cala_df <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/DetHist_Cala.csv", col_names = TRUE, na = c("", "NA"))
+DH_Cala_df <- DH_Cala_df[ -c(1)] # remove redundant row
+umf_Cala <- unmarkedFrameOccu(y = DH_Cala_df, siteCovs = siteCovs, obsCovs = obsCovs) # unmarked frame object
+#summary(umf_Cala)
+
+# Cougar
+DH_Feco_df <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/DetHist_Feco.csv", col_names = TRUE, na = c("", "NA"))
+DH_Feco_df <- DH_Feco_df[ -c(1)] # remove redundant row
+umf_Feco <- unmarkedFrameOccu(y = DH_Feco_df, siteCovs = siteCovs, obsCovs = obsCovs) # unmarked frame object
+#summary(umf_Feco) 
+
+
+# Bobcat
+DH_Feru_df <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/DetHist_Feru.csv", col_names = TRUE, na = c("", "NA"))
+DH_Feru_df <- DH_Feru_df[ -c(1)] # remove redundant row
+umf_Feru <- unmarkedFrameOccu(y = DH_Feru_df, siteCovs = siteCovs, obsCovs = obsCovs) # unmarked frame object
+#summary(umf_Feru)
+
+# Carnivore Functional Group
+DH_Carnivore_df <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/DetHist_Carniv.csv", col_names = TRUE, na = c("", "NA"))
+DH_Carnivore_df <- DH_Carnivore_df[ -c(1)] # remove redundant row 
+umf_Carnivore <- unmarkedFrameOccu(y = DH_Carnivore_df, siteCovs = siteCovs, obsCovs = obsCovs) # unmarked frame object
+#summary(umf_Carnivore)
+
+# Herbivore Functional Group
+DH_Herbivore_df <- read_csv("C:/Users/prwb/Documents/_research_projects/prj_1601ubc_gnce_connectivity/methods/00_github_rsh_connectivity/data_copy/DetHist_Herbiv.csv", col_names = TRUE, na = c("", "NA"))
+DH_Herbivore_df <-  DH_Herbivore_df[ -c(1)] # remove redundant row
+umf_Herbivore <- unmarkedFrameOccu(y =  DH_Herbivore_df, siteCovs = siteCovs, obsCovs = obsCovs)  # unmarked frame object
+#summary(umf_Herbivore) 
 
 ```
 
-### Occupancy Model: ___Myotis lucifugus___ (MYLU)
+### Step 2: Single-season species-specific occupancy models and model selection using AIC
 
-Here I run preliminary occupancy models and model selection for the endangered MYLU.   
-- **Occupancy covariates:** Elevation   
-- **Detectability covariates:** GLA, LAI.4, LAI.5   
+Here I fit occupancy models to camera trap data and use and model selection to identify important covariates for predicting occupancy at the landscape scale. I use the `unmarked:occu()` function to fit the [MacKenzie et al. (2002)](https://www.uvm.edu/rsenr/vtcfwru/spreadsheets/occupancy/Occupancy%20Exercises/Exercise3/MacKenzie%20et%20al.%20single-season.pdf) model.  
 
-You can also embed plots, for example:
+**Occupancy covariates:**  
+ - TRI_STRM: topographic rugedness   
+ - yrsinc_FIRE: years since fire  
+ - zs_MEAN: severity within 500m  
+ - landcover: class (USGS model)  
+**Detectability covariates:**  
+ - visib: visibility of the site  
+ - effort: number of days camera operational (out of 7d ocassion length)   
+
+ADD knownOcc=numeric() for a priori incidentals.
 
 ```{r echo=FALSE, warning=FALSE}
-occMYLU <- read_csv("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/rDetHist/DetHist_MYLU.csv", col_names = TRUE, 
-                      col_types = cols(
-                          X1 = col_character(),
-                          o1 = col_logical(),
-                          o2 = col_logical(),
-                          o3 = col_logical(),
-                          o4 = col_logical(),
-                          o5 = col_logical(),
-                          o6 = col_logical(),
-                          o7 = col_logical(),
-                          o8 = col_logical(),
-                          o9 = col_logical(),
-                          o10 = col_logical(),
-                          o11 = col_logical(), 
-                          o12 = col_logical(),
-                          o13 = col_logical(),
-                          o14 = col_logical()), locale = default_locale(), na = c("", "NA"))
-y <- occMYLU[,2:15]
-siteCovs <- sites_2016[,c("Elev")]
+sp_ap <- c(1) # Species presence dectectd a priori at site row numbers
+```
 
-GLA <- sites_2016[,c("GLA.1","GLA.2","GLA.3","GLA.4","GLA.5","GLA.6","GLA.7","GLA.8","GLA.9","GLA.10","GLA.11","GLA.12","GLA.13","GLA.14")]
-GLA_ungroup <- ungroup(GLA)
-GLA_df <- as.data.frame(GLA_ungroup)
+#### Mule Deer
 
-LAI.4 <- sites_2016[,c("LAI.4.1","LAI.4.2","LAI.4.3","LAI.4.4","LAI.4.5","LAI.4.6","LAI.4.7","LAI.4.8","LAI.4.9","LAI.4.10","LAI.4.11","LAI.4.12","LAI.4.13","LAI.4.14")]
-LAI.4_ungroup <- ungroup(LAI.4)
-LAI.4_df <- as.data.frame(LAI.4_ungroup)
-                       
-obsCovs <- list(gaplight=GLA_df, leafarea=LAI.4_df)
-#names(obsCovs) <- c("gaplight","leafarea")
+```{r echo=FALSE, warning=FALSE}
 
-myluUMF <- unmarkedFrameOccu(y = y, siteCovs = siteCovs, obsCovs = obsCovs)
+fm1 <- occu(~ 1 ~ 1, umf_Odhe, knownOcc=sp_ap)         # null nodel
+fm2 <- occu(~ 1 ~ yrsinc_FIRE, umf_Odhe, knownOcc=sp_ap)     # occupancy modeled with ...
+fm3 <- occu(~ 1 ~ TRI_STRM, umf_Odhe, knownOcc=sp_ap)  # occupancy modeled with ...
+fm4 <- occu(~ 1 ~ yrsinc_FIRE, umf_Odhe, knownOcc=sp_ap) # occupancy modeled with year since fire
+fm5 <- occu(~ 1 ~ zs_MEAN, umf_Odhe, knownOcc=sp_ap)   # occupancy modeled with fire severity as occupancy covariate
+fm6 <- occu(~ effort ~ 1, umf_Odhe, knownOcc=sp_ap)     # occupancy modeled with trapping effort as detectability covariate
+fm7 <- occu(~ visib ~ 1, umf_Odhe, knownOcc=sp_ap)  # occupancy modeled with camera visibility as detectability covariate
+fm8 <- occu(~ 1 ~ zs_MEAN + yrsinc_FIRE, umf_Odhe, knownOcc=sp_ap) # occupancy modeled with ...
+fm9 <- occu(~ 1 ~ yrsinc_FIRE + zs_MEAN, umf_Odhe, knownOcc=sp_ap)   # occupancy modeled with ...
 
-summary(myluUMF)
-plot(myluUMF, panels = 4)
-# Double right-hand side formula describing covariates of detection and occupancy in that order
-fm1 <- occu(~ 1 ~ 1, myluUMF)
-fm2 <- occu(~ 1 ~ Elev, myluUMF)
-fm3 <- occu(~ leafarea ~ 1, myluUMF)
-fm4 <- occu(~ gaplight ~ 1, myluUMF)
-fm5 <- occu(~ leafarea + gaplight ~ 1, myluUMF)
-#fm5 <- occu(~ 1 ~ Elev, myluUMF, starts=c(100,1000,0))# how to improve starting values?
-#fm6 <- occu(~ 1 ~ habitat, myluUMF)
-
-## Model Selection
-fmsMYLU <- fitList('psi(.)p(.)' = fm1,
-               'psi(.)p(elevation)' = fm2,
-               'psi(leaf area index)p(.)' = fm3,
-               'psi(gap light)p(.)' = fm4,
-               'psi(leaf area index + gap light)p(.)' = fm5 )
-modSel(fmsMYLU)
+fm_Odhe <- fitList('psi(.)p(.)' = fm1,
+                   'psi(yrsinc.fire)p(.)' = fm2,
+                   'psi(TRI)p(.)' = fm3,
+                   'psi(yrsinc.fire2)p(.)' = fm4,
+                   'psi(severity)p(.)' = fm5,
+                   'psi(.)p(effort)' = fm6,
+                   'psi(.)p(visibility)' = fm7,
+                   'psi(severity + year)p(.)' = fm8,
+                   'psi(year + severity)p(.)' = fm9
+)
+modSel(fm_Odhe)
+Odhe_modSel <- modSel(fm_Odhe)
 
 ```
+
+#### Coyote
+
+```{r echo=FALSE, warning=FALSE}
+
+fm11 <- occu(~ 1 ~ 1, umf_Cala, knownOcc=sp_ap)         # null nodel
+fm12 <- occu(~ 1 ~ yrsinc_FIRE, umf_Cala, knownOcc=sp_ap)     # occupancy modeled with ...
+fm13 <- occu(~ 1 ~ TRI_STRM, umf_Cala, knownOcc=sp_ap)  # occupancy modeled with ...
+fm14 <- occu(~ 1 ~ landcover, umf_Cala, knownOcc=sp_ap) # occupancy modeled with ...
+fm15 <- occu(~ 1 ~ zs_MEAN, umf_Cala, knownOcc=sp_ap)   # occupancy modeled with ...
+fm16 <- occu(~ effort ~ 1, umf_Cala, knownOcc=sp_ap)     # occupancy modeled with ...
+fm17 <- occu(~ visib ~ 1, umf_Cala, knownOcc=sp_ap)  # occupancy modeled with ...
+fm18 <- occu(~ 1 ~ zs_MEAN + yrsinc_FIRE, umf_Cala, knownOcc=sp_ap) # occupancy modeled with ...
+fm19 <- occu(~ 1 ~ yrsinc_FIRE + zs_MEAN, umf_Cala, knownOcc=sp_ap)   # occupancy modeled with ...
+
+## Model Selection
+fm_Cala <- fitList('psi(.)p(.)' = fm11,
+                  'psi(yrsinc.fire)p(.)' = fm12,
+                  'psi(TRI)p(.)' = fm13,
+                  'psi(landcover)p(.)' = fm14,
+                  'psi(severity)p(.)' = fm15,
+                  'psi(.)p(effort)' = fm16,
+                  'psi(.)p(visibility)' = fm17,
+                  'psi(severity + year)p(.)' = fm18,
+                  'psi(year + severity)p(.)' = fm19
+)
+modSel(fm_Cala)
+Cala_modSel <- modSel(fm_Cala)
+
+```
+
+
+
+#### Coyote
+
+```{r echo=FALSE, warning=FALSE}
+fm11 <- occu(~ 1 ~ 1, umf_Cala, knownOcc=sp_ap)         # null nodel
+fm12 <- occu(~ 1 ~ yrsinc_FIRE, umf_Cala, knownOcc=sp_ap)     # occupancy modeled with ...
+fm13 <- occu(~ 1 ~ TRI_STRM, umf_Cala, knownOcc=sp_ap)  # occupancy modeled with ...
+fm14 <- occu(~ 1 ~ landcover, umf_Cala, knownOcc=sp_ap) # occupancy modeled with ...
+fm15 <- occu(~ 1 ~ zs_MEAN, umf_Cala, knownOcc=sp_ap)   # occupancy modeled with ...
+fm16 <- occu(~ effort ~ 1, umf_Cala, knownOcc=sp_ap)     # occupancy modeled with ...
+fm17 <- occu(~ visib ~ 1, umf_Cala, knownOcc=sp_ap)  # occupancy modeled with ...
+fm18 <- occu(~ 1 ~ zs_MEAN + yrsinc_FIRE, umf_Cala, knownOcc=sp_ap) # occupancy modeled with ...
+fm19 <- occu(~ 1 ~ yrsinc_FIRE + zs_MEAN, umf_Cala, knownOcc=sp_ap)   # occupancy modeled with ...
+
+fm_Cala <- fitList('psi(.)p(.)' = fm11,
+                  'psi(yrsinc.fire)p(.)' = fm12,
+                  'psi(TRI)p(.)' = fm13,
+                  'psi(landcover)p(.)' = fm14,
+                  'psi(severity)p(.)' = fm15,
+                  'psi(.)p(effort)' = fm16,
+                  'psi(.)p(visibility)' = fm17,
+                  'psi(severity + year)p(.)' = fm18,
+                  'psi(year + severity)p(.)' = fm19
+)
+modSel(fm_Cala)
+Cala_modSel <- modSel(fm_Cala)
+
+```
+
+#### Cougar
+
+```{r echo=FALSE, warning=FALSE}
+
+#fm31 <- occu(~ 1 ~ 1, umf_Feco, knownOcc=sp_ap)         # null nodel
+#fm32 <- occu(~ 1 ~ cc_oc, umf_Feco, knownOcc=sp_ap)     # occupancy modeled with ...
+#fm33 <- occu(~ 1 ~ TRI_STRM, umf_Feco, knownOcc=sp_ap)  # occupancy modeled with ...
+#fm34 <- occu(~ 1 ~ yrsinc_FIRE, umf_Feco, knownOcc=sp_ap) # occupancy modeled with ...
+#fm35 <- occu(~ 1 ~ zs_MEAN, umf_Feco, knownOcc=sp_ap)   # occupancy modeled with ...
+#fm36 <- occu(~ 1 ~ landcover, umf_Feco, knownOcc=sp_ap)     # occupancy modeled with ...
+#fm37 <- occu(~ effort ~ 1, umf_Feco, knownOcc=sp_ap)  # occupancy modeled with ...
+#fm38 <- occu(~ visib ~ 1, umf_Feco, knownOcc=sp_ap) # occupancy modeled with ...
+#fm39 <- occu(~ 1 ~ yrsinc_FIRE + zs_MEAN, umf_Feco, knownOcc=sp_ap)   # occupancy modeled with ...
+
+## Model Selection
+#fm_Feco <- fitList('psi(.)p(.)' = fm31,
+#                   'psi(cc)p(.)' = fm32,
+#                   'psi(TRI)p(.)' = fm33,
+#                   'psi(yrsinc.fire)p(.)' = fm34,
+#                   'psi(severity)p(.)' = fm35,
+#                   'psi(landcover)p(.)' = fm36,
+#                   'psi(.)p(effort)' = fm37,
+#                   'psi(.)p(visibility)' = fm38,
+#                   'psi(yrsinc.fire + severity)p(.)' = fm39
+#)
+#modSel(fm_Feco)
+#Feco_modSel <- modSel(fm_Feco)
+
+```
+
+
+#### Bobcat
+
+```{r echo=FALSE, warning=FALSE}
+
+fm41 <- occu(~ 1 ~ 1, umf_Feru, knownOcc=sp_ap)         # null nodel
+fm42 <- occu(~ 1 ~ cc_oc, umf_Feru, knownOcc=sp_ap)     # occupancy modeled with ...
+fm43 <- occu(~ 1 ~ TRI_STRM, umf_Feru, knownOcc=sp_ap)  # occupancy modeled with ...
+fm44 <- occu(~ 1 ~ yrsinc_FIRE, umf_Feru, knownOcc=sp_ap) # occupancy modeled with ...
+fm45 <- occu(~ 1 ~ zs_MEAN, umf_Feru, knownOcc=sp_ap)   # occupancy modeled with ...
+fm46 <- occu(~ 1 ~ cc_oc + yrsinc_FIRE, umf_Feru, knownOcc=sp_ap)     # occupancy modeled with ...
+fm47 <- occu(~ effort ~ 1, umf_Feru, knownOcc=sp_ap)  # occupancy modeled with ...
+fm48 <- occu(~ visib ~ 1, umf_Feru, knownOcc=sp_ap) # occupancy modeled with ...
+#fm49 <- occu(~ 1 ~ yrsinc_FIRE + zs_MEAN, umf_Feru, knownOcc=sp_ap)   # occupancy modeled with ...
+
+## Model Selection
+fm_Feru <- fitList('psi(.)p(.)' = fm41,
+                   'psi(cc)p(.)' = fm42,
+                   'psi(TRI)p(.)' = fm43,
+                   'psi(yrsinc.fire)p(.)' = fm44,
+                   'psi(severity)p(.)' = fm45,
+                   'psi(cc + year)p(.)' = fm46,
+                   'psi(.)p(effort)' = fm47,
+                   'psi(.)p(visibility)' = fm48
+                   #'psi(year + severity)p(.)' = fm49
+)
+modSel(fm_Feru)
+Feru_modSel <- modSel(fm_Feru)
+
+```
+
+
+#### Carnivore
+
+```{r echo=FALSE, warning=FALSE}
+
+fm101 <- occu(~ 1 ~ 1, umf_Carnivore, knownOcc=sp_ap)         # null nodel
+fm102 <- occu(~ 1 ~ yrsinc_FIRE, umf_Carnivore, knownOcc=sp_ap)     # occupancy modeled with year since fire
+fm103 <- occu(~ 1 ~ TRI_STRM, umf_Carnivore, knownOcc=sp_ap)  # occupancy modeled with topographic ruggedness
+fm104 <- occu(~ 1 ~ cc_oc, umf_Carnivore, knownOcc=sp_ap) # occupancy modeled with canopy closure
+fm105 <- occu(~ 1 ~ zs_MEAN, umf_Carnivore, knownOcc=sp_ap)   # occupancy modeled with fire severity
+fm106 <- occu(~ 1 ~ landcover, umf_Carnivore, knownOcc=sp_ap)     # occupancy modeled with ...
+fm107 <- occu(~ effort ~ 1, umf_Carnivore, knownOcc=sp_ap)  # occupancy modeled with ...
+fm108 <- occu(~ visib ~ 1, umf_Carnivore, knownOcc=sp_ap) # occupancy modeled with ...
+fm109 <- occu(~ 1 ~ yrsinc_FIRE + zs_MEAN, umf_Carnivore, knownOcc=sp_ap)   # occupancy modeled with ...
+#fm110 <- occu(~ 1 ~ elev, umf_Carnivore, knownOcc=sp_ap)   # 
+fm111 <- occu(~ visib ~ yrsinc_FIRE + TRI_STRM, umf_Carnivore, knownOcc=sp_ap)   # 
+fm112 <- occu(~ 1 ~ yrsinc_FIRE + TRI_STRM, umf_Carnivore, knownOcc=sp_ap)   # 
+
+## Model Selection
+fm_Carniv <- fitList('psi(.)p(.)' = fm101,
+                     'psi(yrsinc.fire)p(.)' = fm102,
+                     'psi(TRI)p(.)' = fm103,
+                     'psi(can.cov)p(.)' = fm104, 
+                     'psi(severity)p(.)' = fm105,
+                     'psi(landcover)p(.)' = fm106,
+                     'psi(.)p(effort)' = fm107,
+                     'psi(.)p(visibility)' = fm108,
+                     'psi(yrsinc.fire + severity)p(.)' = fm109,
+      #               'psi(elevation)p(.)' = fm110,
+                     'psi(yrsinc.fire + TRI)p(visibility)' = fm111,
+                     'psi(yrsinc.fire + TRI)p(.)' = fm112
+)
+modSel(fm_Carniv)
+Carnivore_modSel <- modSel(fm_Carniv)
+
+```
+
+#### Herbivore
+
+```{r echo=FALSE, warning=FALSE}
+
+fm201 <- occu(~ 1 ~ 1, umf_Herbivore, knownOcc=sp_ap)         # null nodel
+fm202 <- occu(~ 1 ~ yrsinc_FIRE, umf_Herbivore, knownOcc=sp_ap)     # occupancy modeled with year since fire
+fm203 <- occu(~ 1 ~ TRI_STRM, umf_Herbivore, knownOcc=sp_ap)  # occupancy modeled with topographic ruggedness
+fm204 <- occu(~ 1 ~ cc_oc, umf_Herbivore, knownOcc=sp_ap) # occupancy modeled with canopy closure
+fm205 <- occu(~ 1 ~ zs_MEAN, umf_Herbivore, knownOcc=sp_ap)   # occupancy modeled with fire severity
+fm206 <- occu(~ 1 ~ landcover, umf_Herbivore, knownOcc=sp_ap)     # occupancy modeled with ...
+fm207 <- occu(~ effort ~ 1, umf_Herbivore, knownOcc=sp_ap)  # occupancy modeled with ...
+fm208 <- occu(~ visib ~ 1, umf_Herbivore, knownOcc=sp_ap) # occupancy modeled with ...
+fm209 <- occu(~ 1 ~ zs_MEAN + cc_oc, umf_Herbivore, knownOcc=sp_ap)   # occupancy modeled with ...
+fm210 <- occu(~ 1 ~ zs_MEAN + yrsinc_FIRE, umf_Herbivore, knownOcc=sp_ap)   # 
+
+## Model Selection
+fm_Herbiv <- fitList('psi(.)p(.)' = fm201,
+                     'psi(yrsinc.fire)p(.)' = fm202,
+                     'psi(TRI)p(.)' = fm203,
+                     'psi(can.cov)p(.)' = fm204,
+                     'psi(severity)p(.)' = fm205,
+                     'psi(landcover)p(.)' = fm206,
+                     'psi(.)p(effort)' = fm207,
+         #            'psi(.)p(visibility)' = fm208,
+                     'psi(severity + can.cov)p(.)' = fm209,
+                     'psi(severity + yrsinc.FIRE)p(.)' = fm210
+)
+modSel(fm_Herbiv)
+Herbivore_modSel <- modSel(fm_Herbiv)
+Herbivore_topmodel_coef <- coef(fm205) #fm205 is top model
+vcov(fm205)
+confint(fm205, type="state", level = 0.95)
+
+Cands <- list(fm201,fm202,fm203,fm204,fm205,fm206,fm207,fm208,fm209,fm210)
+Modnames <- c("psi(.)p(.)","psi(yrsinc.fire)p(.)","psi(TRI)p(.)","psi(can.cov)p(.)","psi(severity)p(.)",
+              "psi(landcover)p(.)","psi(.)p(effort)","psi(.)p(visibility)","psi(severity + can.cov)p(.)",
+              "psi(severity + yrsinc.FIRE)p(.)"
+              )
+
+```
+
+
 
 
 ### Session Info

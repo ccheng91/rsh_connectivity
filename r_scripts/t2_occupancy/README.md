@@ -3,9 +3,16 @@ Date created: ___2017-Nov-15___
 Last modified: ___2017-Nov-15___   
 
 
-### Task2: Occupancy MOdels
+### Task2: Occupancy Models
 
-I will use occupancy models to predict occupancy across the study area using quantitative camera trap data.  
+I will use occupancy models to predict occupancy across the study area using quantitative camera trap data. Here I provide results from occupancy models for the following species and functional groups:
+- Coyote  
+- Cougar  
+- Black-tailed deer  
+- Elk  
+- Bear  
+- Herbivores  
+- Carnivores  
   
 ## Methods
 I will use `unmarked` to estimate species occupancy.  
