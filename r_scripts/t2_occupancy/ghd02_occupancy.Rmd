@@ -1,7 +1,7 @@
 ---
-title: "Occupancy Analysis"
+title: "Thesis: Occupancy Analysis"
 author: "burkeprw"
-date: "November 12, 2017"
+date: "November 15, 2017"
 output: github_document
 ---
 

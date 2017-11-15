@@ -1,6 +1,6 @@
 # Patrick Burke UBC MSc Thesis Project
 Date created: ___2017-Jun-15___   
-Last modified: ___2017-Nov-13___   
+Last modified: ___2017-Nov-15___   
 
 
 ## Project Title:  
@@ -8,16 +8,17 @@ Last modified: ___2017-Nov-13___
 Welcome Visitors!     
 
 ### This GitHub reop contains the following:
-1. **[Task 1:]()** Study design, sampling locations, and raw data.   
-2. **[Task 2:]()** Occupancy models for bat species.        
-3. **[Task 3:]()** Connectivity models. [in progress]      
+1. **[Task 1:](https://github.com/burkeprw/rsh_connectivity/tree/master/r_scripts/t1_sampling)** Study design, sampling locations, and raw data.   
+2. **[Task 2:](https://github.com/burkeprw/rsh_connectivity/tree/master/r_scripts/t2_occupancy)** Occupancy models for bat species.   
+3. **[Task 3:](https://github.com/burkeprw/rsh_connectivity/tree/master/r_scripts/t3_connectivity)** Connectivity models. [in progress]      
 
-The purpose of this public GitHub repository is to communicate details of my data analysis to my committee members.    
+The purpose of this public GitHub repository is to communicate details of my data analysis to my committee members.   
+
 ## Thesis Abstract   
 [INSERT]
 
-**[Figure 1](figures/fig1_zool500ds_20171114.pdf)** shows a map of sample locations. 
-![alt text](figures/fig1_zool500ds_20171114-1.png)
+**[Figure 1](figures/gis_gnce_stations2016.pdf)** shows a map of sample locations. 
+![alt text](figures/gis_gnce_stations2016.png)
 
 **Figure 2**: Acoustic sampling equipment in northern BC
 ![alt text](figures/IMG_0316.JPG)

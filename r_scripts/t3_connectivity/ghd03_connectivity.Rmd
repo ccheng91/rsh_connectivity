@@ -1,0 +1,44 @@
+---
+title: "Thesis: Connectivity Analysis"
+author: "burkeprw"
+date: "November 15, 2017"
+output: github_document
+---
+
+First, load packages.
+
+```{r message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(forcats))
+suppressPackageStartupMessages(library(camtrapR))
+suppressPackageStartupMessages(library(unmarked))
+```
+
+
+### Step 1:   
+
+
+```{r echo=FALSE, warning=FALSE}
+
+
+```
+
+
+### Step 2:   
+
+
+```{r echo=FALSE, warning=FALSE}
+
+
+```
+
+
+### Session Info
+
+```{r}
+sessionInfo()
+```
+
+
