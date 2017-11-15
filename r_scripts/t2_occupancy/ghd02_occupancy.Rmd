@@ -19,21 +19,24 @@ suppressPackageStartupMessages(library(unmarked))
 
 ### Step 1: Read Data in Wide Format for `unmarked`  
 
+The first step is to set up an unmarked frame containing detection history and covariates for each species and functional group. The site data and detection histories are saved in [data_copy](https://github.com/burkeprw/rsh_connectivity/tree/master/data_copy). 
+
+The record table is created using the `camptrapR:recordTable()` which reads image metadata (including species codes) directly from image files using the free software `ExifTool` and `digiKam`. Code for extracting this information and writing detection histories to file can be found in [01_analysis_camtrapR_20170717.R](https://github.com/burkeprw/rsh_connectivity/blob/master/r_scripts/t2_occupancy/01_analysis_camtrapR_20170717.R).
+
+
 I read the .rds file saved in [Task 1](https://github.com/burkeprw/rsh_zool500_bats/blob/master/r_scripts/t1_tidydata/ghd01_tidydata.md). I also read data files from BC Agricultural Land Use Inventory (ALUI) for cover type and land use data. It is necessary to make the following formatting adjustments to the .csv data:  
 - DateTimeOriginal column is formatted as YYYY-MM-DD hh:mm:ss in Excel before saving, then read into R using `format = "%Y-%m-%d %H:%M:%S`  
 
-I made the following edits to "all_sitecovs.csv":
-- added BC ALUI landcovers   
-- added elevation from DEM   
+I made the following edits to "ct_gncesites_2017-07jul15.csv":
+- added topographic ruggedness (TRI_STRM)    
+- added years since fire, based on     
 - changes Site names for NABat sites with year prefix
 - removed sites with NA start dates   
 - Added 14 iterations of the observation covariates: GLA and LAI.4   
 
 ```{r warning=FALSE, message=FALSE}
 
-all_obs_full_read <- readRDS("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/all_obs_comp.rds")
-
-sitecovs <- read_csv("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/data_copy/all_sitecovs.csv")
+sites <- read_csv("ct_gncesites_2017-07jul15.csv")
 
 sites_bats <- read_csv("C:/Users/prwb/Documents/_research_projects/admin_ubc_msc/_courses_wkshp/zool500_directedstudies/deliverables/00_github_zool500_bats/r_output/dat_allsites.csv")
 
@@ -43,6 +46,7 @@ sites_2016$start_date <- as.Date(sites_2016$start_date , "%Y-%m-%d")
 sites_2016$end_date <- as.Date(sites_2016$end_date , "%Y-%m-%d")
 
 ```
+
 
 Look at the distribution of sampling periods across time:   
 
@@ -76,11 +80,65 @@ camopPlot(camOp = detop)
 ```
 
 
-I coerce the data using the package `camtrapR` and function 'detectionHistory()' to prepare for modeling. Date requirements for `unmarked` include 1st 3 columns in this order: site, date, and the occ/count variable, followed by detection periods. Here I use 4 day sample periods (occasionLength = 7).   
+Next I set up observation and site covariate data frames.
+
+"ObsCovs_effort_scaled.csv"
+
+"ObsCovs_vist_wt.csv"
+
+
+```{r warning=FALSE, message=FALSE}
+
+# list of stations in alphabetical order for row.names
+
+stations <- c("CT-3-DEGU1-0501", "CT-27-COCR2-0625", "CT-28-REPE2-0830", "CT-115-LAMC-0501", "CT-115-WHCK-0714",
+              "CT-133-WUDH-0815", "CT-283-STRF-0824", "CT-286-SHFI-0824", "CT-287-RAME1-0826", "CT-287-MCGM-0623",
+              "CT-288-SOPA-0624", "CT-305-HZCK-0830", "CT-306-FMCK-0830", "CT-450-LSTR1-0828", "CT-474-FLCR-0829", 
+              "CT-479-COCR1-0622", "CT-483-SIRI-0625", "CT-539-BUOR-0622", "CT-540-RLTR-0624", "CT-541-RBFI1-0826",
+              "CT-544-RECK-0831", "CT-544-REPE1-0831", "CT-565-HIME-0624", "CT-566-SOCR2-0623", "CT-570-BORI-0624", 
+              "CT-570-RAME2-0623", "CT-672-EAPA-0621", "CT-675-GRCR-0621", "CT-755-MTHA-0621", "CT-761-WFMR1-0908", 
+              "CT-1168-PAIB-0712", "CT-1168-PARI2-0712", "CT-1168-PARI3-0712", "CT-1240-PAFC-0504", "CT-1262-POCK-0410", 
+              "CT-1374-SUMC-0521", "CT-1390-SOWC-0520", "CT-1465-EIMC-0523", "CT-1501-CORI-0714", "CT-1596-WIWE-0522", 
+              "CT-1597-LODM-0523", "CT-1598-PARI1-0430", "CT-1599-COOC-0522", "CT-1600-PETC-0522", "CT-1602-HEOC-0522", 
+              "CT-1605-BOCK-0421" )
+effort <- read.csv(file = "~/_research_projects/prj_1601ubc_gnce_connectivity/methods/02_occupancy/rOutput/ObsCovs_effort_scaled.csv",
+                   header = TRUE, row.names = stations,  stringsAsFactors = FALSE, na.strings = "NA")
+
+# check that row names match
+effort <- effort[ -c(1)] # remove redundant column
+visib <- read.csv(file = "~/_research_projects/prj_1601ubc_gnce_connectivity/methods/02_occupancy/rOutput/ObsCovs_vist_wt.csv", 
+                  header = TRUE, row.names = stations, stringsAsFactors = FALSE, na.strings = "NA")
+visib <- visib[ -c(1)] # remove redundant column
+visib.z <- scale(visib) # standardize
+
+siteCovs <- ct_tidy[ ,c("cc_oc","TRI_STRM","yrsinc_FIRE","zs_MEAN","landcover","elev")]
+
+cc_oc.z <- scale(siteCovs$cc_oc)
+TRI_STRM.z <- scale(siteCovs$TRI_STRM)
+yrsinc_FIRE.z <- scale(siteCovs$yrsinc_FIRE)
+zs_MEAN.z <- scale(siteCovs$zs_MEAN)
+landcover <- siteCovs$landcover
+elev.z <- scale(siteCovs$elev)
+
+siteCovs <- data.frame(cc_oc=cc_oc.z,TRI_STRM=TRI_STRM.z,yrsinc_FIRE=yrsinc_FIRE.z,zs_MEAN=zs_MEAN.z,
+                       landcover=landcover,elev=elev.z)
+
+obsCovs <- list(effort=effort[,c("o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10",
+                                 "o11", "o12", "o13", "o14", "o15", "o16", "o17", "o18", "o19", "o20",
+                                 "o21", "o22", "o23")],
+                  visib=visib.z[,c("o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10",
+                                 "o11", "o12", "o13", "o14", "o15", "o16", "o17", "o18", "o19", "o20",
+                                 "o21", "o22", "o23")])
+
+```
+
+#          Part 2) Single-season species-specific occupancy models and Model selection using AIC
+
+Next I will make detection histories for each species and functional group using the package `camtrapR` and function 'detectionHistory()'. Date requirements for `unmarked` include 1st 3 columns in this order: site, date, and the occ/count variable, followed by detection periods. Here I use 7 day sample periods (occasionLength = 7).   
 
 Need to check for:   
-- missing data   
-- detector not working   
+-     
+-     
 
 ```{r pressure, echo=FALSE}
 
@@ -100,7 +158,7 @@ DetHist_Mylu <- detectionHistory(recordTable = all_obs_df,
                                  recordDateTimeCol = "DateTimeOriginal",
                                  recordDateTimeFormat = "%Y-%m-%d %H:%M:%S",
                                  species = "MYLU",
-                                 occasionLength = 4,
+                                 occasionLength = 7,
                                  day1 = "station",
                                  timeZone = "America/Vancouver",
                                  includeEffort = FALSE,
