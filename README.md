@@ -17,8 +17,8 @@ The purpose of this public GitHub repository is to communicate details of my dat
 ## Thesis Abstract   
 [INSERT]
 
-**[Figure 1](figures/gis_gnce_stations2016.pdf)** shows a map of sample locations. 
-![alt text](figures/gis_gnce_stations2016.png)
+**[Figure 1](https://github.com/burkeprw/rsh_connectivity/blob/master/figures/gis_gnce_stations2016.pdf)** shows a map of sample locations. 
+![alt text](figures/gis_gnce_stations2016-1.png)
 
 **Figure 2**: Acoustic sampling equipment in northern BC
 ![alt text](figures/IMG_0316.JPG)
