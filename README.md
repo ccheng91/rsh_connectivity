@@ -12,7 +12,7 @@ Welcome Visitors!
 2. **[Task 2:](https://github.com/burkeprw/rsh_connectivity/tree/master/r_scripts/t2_occupancy)** Occupancy models for bat species.   
 3. **[Task 3:](https://github.com/burkeprw/rsh_connectivity/tree/master/r_scripts/t3_connectivity)** Connectivity models. [in progress]      
 
-The purpose of this public GitHub repository is to communicate details of my data analysis to my committee members.   
+The purpose of this public GitHub repository is to communicate results and code for data analysis to committee members.   
 
 ## Thesis Abstract   
 [INSERT]
